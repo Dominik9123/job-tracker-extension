@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import './Dashboard.css';
 
 interface JobApplication {
@@ -62,6 +63,12 @@ interface NewApplicationForm {
   workMode: WorkMode;
   nextStepDate: string;
   link: string;
+}
+
+interface ToastState {
+  id: number;
+  message: string;
+  tone: 'success' | 'info' | 'error';
 }
 
 const INITIAL_NEW_APP: NewApplicationForm = {
@@ -155,6 +162,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
   const [sortBy] = useState<'date' | 'company' | 'portal'>('date');
   const [formError, setFormError] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const addFormRef = useRef<HTMLFormElement>(null);
@@ -419,6 +427,21 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     return app.salary;
   };
 
+  const getSalaryBadgeData = (targetApp: JobApplication) => {
+    const parsedSalary = parseSalary(targetApp.salary);
+    const salaryFrom = targetApp.salaryFrom ?? parsedSalary.salaryFrom;
+    const salaryTo = targetApp.salaryTo ?? parsedSalary.salaryTo;
+    const currency = targetApp.currency ?? parsedSalary.currency;
+    const employmentType = targetApp.employmentType ?? parsedSalary.employmentType;
+    const salaryMode = targetApp.salaryMode ?? parsedSalary.salaryMode;
+
+    return {
+      amount: formatSalary(salaryFrom, salaryTo, currency),
+      employmentType,
+      salaryModeLabel: salaryModeLabels[lang][salaryMode],
+    };
+  };
+
   const getWorkMode = (app: JobApplication): WorkMode => {
     if (app.workMode) return app.workMode;
     if (app.company === 'Allegro' || app.company === 'Revolut') return 'hybrid';
@@ -448,6 +471,14 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     setNewApp(INITIAL_NEW_APP);
     setEditingId(null);
     setFormError('');
+  };
+
+  const showToast = (message: string, tone: ToastState['tone'] = 'info') => {
+    setToast({
+      id: Date.now(),
+      message,
+      tone,
+    });
   };
 
   const openFreshApplicationForm = () => {
@@ -505,6 +536,10 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
       );
       setIsFormOpen(false);
       resetForm();
+      showToast(
+        lang === 'pl' ? 'Oferta zostala zaktualizowana.' : 'Application updated successfully.',
+        'success',
+      );
       return;
     }
 
@@ -530,11 +565,21 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     setApplications((prev) => [application, ...prev]);
     setIsFormOpen(false);
     resetForm();
+    showToast(
+      lang === 'pl' ? 'Nowa oferta zostala dodana.' : 'New application added successfully.',
+      'success',
+    );
   };
 
   const handleStatusChange = (id: number, newStatus: DashboardStatus) => {
     setApplications((prev) =>
       prev.map((app) => (app.id === id ? { ...app, status: newStatus } : app)),
+    );
+    showToast(
+      lang === 'pl'
+        ? `Status zmieniono na ${statusLabels.pl[newStatus].toLowerCase()}.`
+        : `Status changed to ${statusLabels.en[newStatus].toLowerCase()}.`,
+      'info',
     );
   };
 
@@ -555,6 +600,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
 
     setApplications((prev) => prev.filter((app) => app.id !== id));
     setActiveNoteId((prev) => (prev === id ? null : prev));
+    showToast(lang === 'pl' ? 'Oferta zostala usunieta.' : 'Application deleted.', 'error');
 
     if (editingId === id) {
       setIsFormOpen(false);
@@ -620,6 +666,16 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     });
   }, [isFormOpen, editingId]);
 
+  useEffect(() => {
+    if (!toast) return;
+
+    const timer = window.setTimeout(() => {
+      setToast(null);
+    }, 2800);
+
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
   const theme = getModalTheme();
 
   if (isLeaving) {
@@ -637,6 +693,21 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
 
   return (
     <div className="dashboard-container fade-in">
+      {toast &&
+        createPortal(
+          <div className={`toast-alert ${toast.tone}`} key={toast.id}>
+            <span className="toast-indicator" aria-hidden="true"></span>
+            <span className="toast-message">{toast.message}</span>
+            <button type="button" className="toast-close-btn" onClick={() => setToast(null)} aria-label="Close toast">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>,
+          document.body,
+        )}
+
       <header className="dashboard-header">
         <div className="header-left">
           <h1 className="brand-logo dashboard-logo">
@@ -718,16 +789,31 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
         {upcomingReminders.length > 0 && (
           <section className="reminder-strip fade-in">
             <div className="reminder-strip-header">
-              <span className="reminder-strip-kicker">REMINDER</span>
-              <h3>{lang === 'pl' ? 'Nadchodzace etapy rekrutacji' : 'Upcoming hiring steps'}</h3>
+              <div className="reminder-strip-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="3" ry="3" />
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                </svg>
+              </div>
+              <div className="reminder-strip-copy">
+                <span className="reminder-strip-kicker">REMINDER</span>
+                <h3>{lang === 'pl' ? 'Nadchodzace etapy rekrutacji' : 'Upcoming hiring steps'}</h3>
+              </div>
             </div>
 
             <div className="reminder-list">
               {upcomingReminders.map((app) => (
                 <article key={app.id} className={`reminder-card ${getReminderTone(getNextStepDate(app))}`}>
                   <div className="reminder-card-main">
-                    <span className="reminder-company">{app.company}</span>
-                    <span className="reminder-position">{app.position}</span>
+                    <div className="reminder-card-portal">
+                      <span className="reminder-portal-logo">
+                        <img src={getPortalIcon(app.portal)} alt={app.portal} className="reminder-portal-image" />
+                      </span>
+                      <div className="reminder-card-copy">
+                        <span className="reminder-company">{app.company}</span>
+                        <span className="reminder-position">{app.position}</span>
+                      </div>
+                    </div>
                   </div>
                   <div className="reminder-card-meta">
                     <span className="reminder-tag">{statusLabels[lang][app.status]}</span>
@@ -1018,7 +1104,10 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
         )}
 
         <div className="applications-grid fade-in">
-          {filteredAndSortedApps.map((app, index) => (
+          {filteredAndSortedApps.map((app, index) => {
+            const salaryBadge = getSalaryBadgeData(app);
+
+            return (
             <div
               key={app.id}
               className={`job-card ${app.status} fade-in-stagger`}
@@ -1071,7 +1160,14 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                 <div className="card-company-logo">
                   <img className="card-logo-image" src={getPortalIcon(app.portal)} alt={app.portal} />
                 </div>
-                <span className="card-salary">{getDisplaySalary(app)}</span>
+                <span className="card-salary" title={getDisplaySalary(app)}>
+                  <span className="card-salary-amount">{salaryBadge.amount}</span>
+                  <span className="card-salary-meta">
+                    <span>{salaryBadge.employmentType}</span>
+                    <span className="card-salary-dot">•</span>
+                    <span>{salaryBadge.salaryModeLabel}</span>
+                  </span>
+                </span>
               </div>
 
               <div className="card-body-main">
@@ -1122,39 +1218,88 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                 </div>
               )}
             </div>
-          ))}
+          );
+          })}
         </div>
 
-        {modalType && (
-          <div className="modal-overlay fade-in" onClick={() => setModalType(null)}>
-            <div className="interview-modal" onClick={(e) => e.stopPropagation()} style={{ borderColor: theme.color }}>
-              <div className="modal-header">
-                <h3 style={{ color: theme.color }}>{theme.title}</h3>
-                <button className="close-modal" onClick={() => setModalType(null)}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                </button>
-              </div>
-
-              <div className="modal-body">
-                {filteredModalJobs.length > 0 ? (
-                  filteredModalJobs.map((job) => (
-                    <div key={job.id} className="modal-job-item" style={{ borderLeft: `4px solid ${theme.color}` }}>
-                      <div className="job-info-main">
-                        <span className="job-company">{job.company}</span>
-                        <span className="job-position">{job.position}</span>
-                      </div>
-                      <div className="job-info-date">{job.date}</div>
+        {modalType &&
+          createPortal(
+            <div className="modal-overlay fade-in" onClick={() => setModalType(null)}>
+              <div
+                className="interview-modal"
+                onClick={(e) => e.stopPropagation()}
+                style={{ borderColor: theme.color }}
+                role="dialog"
+                aria-modal="true"
+              >
+                <div className="modal-header">
+                  <div className="modal-header-main">
+                    <div className="modal-status-icon" style={{ color: theme.color, borderColor: theme.color }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="7" width="20" height="14" rx="3" ry="3" />
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+                      </svg>
                     </div>
-                  ))
-                ) : (
-                  <p style={{ textAlign: 'center', opacity: 0.5 }}>
-                    {lang === 'pl' ? 'Brak ofert o tym statusie.' : 'No jobs with this status.'}
-                  </p>
-                )}
+
+                    <div className="modal-header-copy">
+                      <span className="modal-kicker">{lang === 'pl' ? 'Przeglad statusu' : 'Status overview'}</span>
+                      <h3 style={{ color: theme.color }}>{theme.title}</h3>
+                    </div>
+                  </div>
+
+                  <div className="modal-header-actions">
+                    <span className="modal-count-badge">
+                      {filteredModalJobs.length} {lang === 'pl' ? 'ofert' : 'jobs'}
+                    </span>
+                    <button type="button" className="close-modal" onClick={() => setModalType(null)}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="modal-body">
+                  {filteredModalJobs.length > 0 ? (
+                    filteredModalJobs.map((job) => (
+                      <article key={job.id} className="modal-job-item" style={{ borderLeft: `4px solid ${theme.color}` }}>
+                        <div className="modal-job-portal-logo">
+                          <img src={getPortalIcon(job.portal)} alt={job.portal} className="modal-job-portal-image" />
+                        </div>
+
+                        <div className="job-info-main">
+                          <div className="modal-job-topline">
+                            <span className="job-company">{job.company}</span>
+                            <span className="modal-job-portal">{job.portal}</span>
+                          </div>
+                          <span className="job-position">{job.position}</span>
+                        </div>
+
+                        <div className="modal-job-meta">
+                          <div className="job-info-date">{formatCardDate(job.date)}</div>
+                          {job.link !== '#' && (
+                            <a href={job.link} className="modal-job-link" target="_blank" rel="noreferrer">
+                              {lang === 'pl' ? 'Otworz' : 'Open'}
+                            </a>
+                          )}
+                        </div>
+                      </article>
+                    ))
+                  ) : (
+                    <div className="modal-empty-state">
+                      <div className="modal-empty-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="15" y1="9" x2="9" y2="15" />
+                          <line x1="9" y1="9" x2="15" y2="15" />
+                        </svg>
+                      </div>
+                      <p>{lang === 'pl' ? 'Brak ofert o tym statusie.' : 'No jobs with this status.'}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
+            </div>,
+            document.body,
+          )}
       </main>
     </div>
   );
