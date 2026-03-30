@@ -1,0 +1,677 @@
+/* ==========================================================================
+   1. ZMIENNE (KOLORY I MOTYW)
+   ========================================================================== */
+:root {
+  --primary-cyan: #00d2ff;
+  --primary-blue: #007aff;
+  --bg-dark: #121417;
+  --form-bg: rgba(255, 255, 255, 0.03);
+  --input-bg: rgba(255, 255, 255, 0.05);
+  --border-light: rgba(255, 255, 255, 0.08);
+  --text-gray: #888;
+}
+
+/* Globalny reset box-sizing */
+* {
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   2. GŁÓWNY KONTENER I EFEKTY TŁA
+   ========================================================================== */
+.login-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  background: radial-gradient(circle at 20% 20%, #1e2227, var(--bg-dark));
+  font-family: 'Inter', sans-serif;
+  z-index: 10;
+  overflow: hidden;
+}
+
+/* Kontener pomocniczy do obsługi blura tła, gdy modal jest otwarty */
+.main-content {
+  width: 100%;
+  height: 100%;
+  transition: filter 0.5s ease, transform 0.5s ease;
+}
+
+/* Stan aktywowany przy otwartym oknie modalnym */
+.main-content.blur-active {
+  filter: grayscale(0.5) brightness(0.5); 
+  transform: scale(0.98);
+  pointer-events: none;
+  will-change: transform, opacity; 
+}
+
+/* ==========================================================================
+   3. BRANDING (SEKCJA LEWA)
+   ========================================================================== */
+.brand-section {
+  position: absolute;
+  left: 8%;
+  top: 15%;
+  text-align: left;
+  z-index: 5;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.brand-logo {
+  font-size: clamp(3rem, 8vw, 5rem);
+  font-weight: 800;
+  color: white;
+  margin: 0;
+  letter-spacing: -2px;
+  line-height: 0.9;
+  opacity: 0.8;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
+}
+
+.brand-logo span {
+  color: var(--primary-cyan);
+  text-shadow: 0 0 20px rgba(0, 210, 255, 0.5);
+}
+
+.brand-slogan {
+  color: #555;
+  font-size: 1.1rem;
+  margin-top: 5px;
+  font-weight: 300;
+  letter-spacing: 1px;
+}
+
+/* ==========================================================================
+   3.5 KAFELEK WTYCZKI (POD LOGIEM) 
+   ========================================================================== */
+.extension-tile {
+  margin-top: 40px;
+  background: var(--form-bg); /* Korzystamy z tej samej zmiennej co formularz */
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  padding: 24px;
+  max-width: 320px;
+  backdrop-filter: blur(15px); /* Spójne z logowaniem */
+  -webkit-backdrop-filter: blur(15px);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  pointer-events: all; /* Bardzo ważne: pozwala klikać przyciski w kafelku */
+  transition: transform 0.3s ease, border-color 0.3s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.extension-tile:hover {
+  transform: translateY(-5px);
+  border-color: var(--primary-cyan); /* Akcent przy najechaniu */
+}
+
+.extension-icon {
+  width: 45px;
+  height: 45px;
+  background: rgba(0, 210, 255, 0.1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-cyan);
+}
+
+.extension-text h4 {
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+.extension-text p {
+  color: var(--text-gray);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.install-btn {
+  background: transparent;
+  border: 1px solid var(--primary-cyan);
+  color: var(--primary-cyan);
+  padding: 10px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-family: inherit;
+}
+
+.install-btn:hover {
+  background: var(--primary-cyan);
+  color: #121417; /* Ciemny tekst na jasnym tle dla czytelności */
+}
+
+
+/* ==========================================================================
+   4. FORMULARZ LOGOWANIA (SEKCJA PRAWA)
+   ========================================================================== */
+.login-form {
+  position: absolute;
+  right: 310px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 380px;
+  padding: 40px;
+  background: var(--form-bg);
+  border-radius: 24px;
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--border-light);
+  box-shadow: -20px 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+.login-form h2 {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 1.8rem;
+  margin: 0 0 8px 0;
+  letter-spacing: -0.5px;
+}
+
+.login-form p.sub-header {
+  color: var(--text-gray);
+  font-size: 0.95rem;
+  margin-bottom: 40px;
+}
+
+/* ==========================================================================
+   5. POLA FORMULARZA (INPUTY)
+   ========================================================================== */
+.input-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 14px 18px;
+  background: var(--input-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.input-group input:focus {
+  border-color: var(--primary-cyan);
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(0, 210, 255, 0.1);
+}
+
+/* Opcje dodatkowe (Zapamiętaj mnie itp.) */
+.form-options {
+  display: flex;
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+  color: #aaa;
+}
+
+.remember-me {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remember-me span {
+  color: var(--text-gray);
+  user-select: none;
+}
+
+/* ==========================================================================
+   6. PRZYCISKI
+   ========================================================================== */
+/* Główny przycisk logowania */
+.login-btn {
+  width: 100%;
+  padding: 14px;
+  background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--primary-blue) 100%);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+
+/* Przycisk logowania przez Google */
+.google-btn {
+  width: 100%;
+  padding: 12px;
+  background: var(--input-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: white;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.google-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ==========================================================================
+   7. ELEMENTY NIESTANDARDOWE (CHECKBOX)
+   ========================================================================== */
+.custom-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.custom-checkbox:checked {
+  background: var(--primary-cyan);
+  border-color: var(--primary-cyan);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.3);
+}
+
+.custom-checkbox:checked::after {
+  content: "✔";
+  color: #121417;
+  font-size: 12px;
+  font-weight: bold;
+}
+/* ==========================================================================
+   8. ELEMENTY DEKORACYJNE I STOPKA FORMULARZA
+   ========================================================================== */
+.separator {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 25px 0;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+/* Linie boczne separatora zamiast tła pod napisem */
+.separator::before,
+.separator::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.separator span {
+  background: transparent !important;
+  padding: 0 15px;
+}
+
+.form-footer {
+  margin-top: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.forgot-pass, 
+.signup-link-btn {
+  color: var(--primary-cyan);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: opacity 0.2s;
+}
+
+.forgot-pass:hover, 
+.signup-link-btn:hover {
+  text-decoration: underline;
+  opacity: 1;
+}
+
+.signup-text {
+  color: var(--text-gray);
+  font-size: 0.85rem;
+}
+
+.signup-link-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 5px;
+  font-family: inherit;
+}
+
+/* ==========================================================================
+   9. INTERFEJS UŻYTKOWNIKA (JĘZYKI I STOPKA STRONY)
+   ========================================================================== */
+.lang-switcher {
+  position: absolute;
+  top: 35px;
+  right: 45px;
+  display: flex;
+  gap: 12px;
+  z-index: 100;
+}
+
+.lang-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-light);
+  border-radius: 12px;
+  padding: 10px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.3s ease;
+  color: #888;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.lang-btn svg {
+  border-radius: 3px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.lang-btn.active {
+  border-color: var(--primary-cyan);
+  background: rgba(0, 210, 255, 0.1);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(0, 210, 255, 0.15);
+}
+
+.lang-btn:not(.active) {
+  opacity: 0.5;
+}
+
+.lang-btn:not(.active) svg {
+  filter: grayscale(1);
+}
+
+.author-footer {
+  position: absolute;
+  left: 8%;
+  bottom: 40px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.author-footer p {
+  color: #555;
+  font-size: 0.85rem;
+  font-weight: 300;
+  letter-spacing: 1px;
+  margin: 0;
+  text-transform: uppercase;
+  opacity: 0.6;
+  transition: opacity 0.3s ease;
+}
+
+.login-container:hover .author-footer p {
+  opacity: 1;
+  color: var(--primary-cyan);
+}
+
+/* ==========================================================================
+   10. MODAL REJESTRACJI (UKŁAD I STRUKTURA)
+   ========================================================================== */
+.modal-overlay {
+  position: fixed;
+  top: 450px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(circle, rgba(0,0,0,0.85) 0%, rgba(18,20,23,0.95) 100%);
+  display: flex !important;
+  justify-content: center; 
+  align-items: center; 
+  z-index: 99999; 
+  animation: fadeIn 0.3s ease;
+}
+
+.register-modal {
+  background: #1e2227;
+  width: 100%;
+  max-width: 850px;
+  border-radius: 32px;
+  border: 1px solid var(--border-light);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  animation: modalSlideUp 0.4s cubic-bezier(0.17, 0.84, 0.44, 1);
+}
+
+.register-modal h2, 
+.form-side h2 {
+  font-size: 2.2rem;
+  font-weight: 800;
+  /* Gradient od białego do cyjanu */
+  background: linear-gradient(to right, #ffffff, var(--primary-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 10px;
+  letter-spacing: -1px;
+}
+
+/* Wersja rozszerzona modala */
+.register-modal.wide {
+  max-width: 950px;
+  flex-direction: row;
+}
+
+.modal-column {
+  flex: 1;
+  padding: 40px;
+}
+
+/* ==========================================================================
+   11. MODAL - SEKCJE WEWNĘTRZNE (INFO I FORMULARZ)
+   ========================================================================== */
+/* Kolumna Informacyjna (Lewa) */
+.info-side {
+  background: linear-gradient(135deg, rgba(0, 210, 255, 0.1) 0%, rgba(0, 122, 255, 0.05) 100%);
+  border-left: 1px solid var(--border-light);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: left;
+}
+
+.info-side h3 {
+  font-size: 1.8rem;
+  font-weight: 800;
+  background: linear-gradient(to right, #fff, var(--primary-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 25px;
+  letter-spacing: -1px;
+}
+
+.trust-list {
+  list-style: none;
+  padding: 0;
+}
+
+.trust-list li {
+  color: #ccc;
+  font-size: 0.95rem;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.trust-list li::before {
+  content: "✦";
+  color: var(--primary-cyan);
+}
+
+/* Kolumna Formularza (Prawa) */
+.modal-form-section {
+  flex: 1;
+  padding: 45px;
+  text-align: center;
+}
+
+.modal-form-section h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(to right, #fff, var(--primary-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0 0 10px 0;
+}
+
+.modal-sub {
+  color: var(--text-gray);
+  font-size: 0.95rem;
+  margin-bottom: 30px;
+  display: block;
+}
+
+.close-modal {
+  position: absolute;
+  top: 20px;
+  right: 25px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 30px;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: 0.2s;
+}
+
+.close-modal:hover {
+  opacity: 1;
+  color: var(--primary-cyan);
+}
+
+.register-modal .input-group {
+  margin-bottom: 15px;
+}
+
+.register-modal .login-btn {
+  margin-top: 10px;
+}
+
+/* Styl dla modala zapomnianego hasła */
+.forgot-modal {
+  max-width: 450px; /* Węższy układ niż rejestracja */
+  display: block;   /* Zapewnia, że animacja skalowania zadziała na jednym bloku */
+}
+
+.forgot-title {
+  font-size: 2rem;
+  font-weight: 800;
+  background: linear-gradient(to right, #fff, var(--primary-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 10px;
+}
+
+.back-btn {
+  margin-top: 25px;
+  display: block;
+  width: 100%;
+  text-align: center;
+}
+
+
+/* Kontener dla rzędu kafelków */
+.tiles-row {
+  display: flex;
+  flex-direction: row; /* Ustawienie poziome */
+  gap: 20px;           /* Odstęp między kafelkami */
+  margin-top: 40px;    /* Odstęp od sloganu JobTracker */
+  pointer-events: all; /* Pozwala na klikanie przycisków */
+}
+
+/* Ujednolicone style kafelków */
+.extension-tile {
+  background: var(--form-bg);
+  border: 1px solid var(--border-light);
+  border-radius: 20px;
+  padding: 24px;
+  width: 300px;        /* Stała szerokość dla spójności */
+  backdrop-filter: blur(15px);
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.extension-tile:hover {
+  transform: translateY(-5px);
+  border-color: var(--primary-cyan);
+}
+
+/* Sekcja mocnego hasła pod kafelkami */
+.power-slogan-container {
+  margin-top: 35px;
+  padding: 18px 24px;
+  background: rgba(255, 255, 255, 0.02); /* Bardzo subtelne tło */
+  border-left: 3px solid var(--primary-cyan); /* Akcent nawiązujący do logo */
+  border-radius: 4px 16px 16px 4px;
+  max-width: 540px; /* Identyczna szerokość jak tiles-row */
+  animation: fadeInEffect 1s ease-out;
+}
+
+.power-slogan-text {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: left;
+  margin: 0;
+}
+
+/* Subtelne wyróżnienie słów kluczowych (jeśli dodasz je w słowniku) */
+.power-slogan-text strong {
+  color: var(--primary-cyan);
+  font-weight: 700;
+}
+
+/* ==========================================================================
+   12. ANIMACJE
+   ========================================================================== */
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(40px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
