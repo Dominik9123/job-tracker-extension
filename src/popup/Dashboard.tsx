@@ -15,6 +15,7 @@ interface JobApplication {
   salaryMode?: SalaryMode;
   employmentType: EmploymentType;
   workMode?: WorkMode;
+  seniority?: Seniority;
   nextStepDate?: string;
   status: 'sent' | 'interview' | 'rejected' | 'offered';
   link: string;
@@ -47,6 +48,8 @@ type SalaryCurrency = 'PLN' | 'EUR' | 'USD' | 'GBP' | 'CHF';
 type EmploymentType = 'B2B' | 'UoP' | 'UZ' | 'UoD' | 'Internship';
 type SalaryMode = 'net' | 'gross';
 type WorkMode = 'remote' | 'hybrid' | 'onsite';
+type Seniority = 'junior' | 'mid' | 'senior' | 'lead';
+type BulkStatusAction = DashboardStatus | 'placeholder';
 type FilterStatus = 'all' | DashboardStatus;
 type FilterPortal = 'all' | string;
 type FilterEmployment = 'all' | EmploymentType;
@@ -61,6 +64,7 @@ interface NewApplicationForm {
   employmentType: EmploymentType;
   salaryMode: SalaryMode;
   workMode: WorkMode;
+  seniority: Seniority;
   nextStepDate: string;
   link: string;
 }
@@ -69,7 +73,12 @@ interface ToastState {
   id: number;
   message: string;
   tone: 'success' | 'info' | 'error';
+  actionLabel?: string;
+  durationMs?: number;
+  onAction?: () => void;
 }
+
+const DASHBOARD_STORAGE_KEY = 'job-tracker-demo-applications-v1';
 
 const INITIAL_NEW_APP: NewApplicationForm = {
   company: '',
@@ -81,8 +90,63 @@ const INITIAL_NEW_APP: NewApplicationForm = {
   employmentType: 'B2B',
   salaryMode: 'net',
   workMode: 'remote',
+  seniority: 'mid',
   nextStepDate: '',
   link: '',
+};
+
+const DEFAULT_APPLICATIONS: JobApplication[] = [
+  { id: 1, date: '2024-03-01', portal: 'LinkedIn', company: 'Google', position: 'Frontend Developer', salary: '18,000 - 24,000 PLN â€˘ B2B â€˘ Netto', employmentType: 'B2B', status: 'interview', link: '#', notes: 'Rekruter: Anna Nowak.' },
+  { id: 2, date: '2024-03-02', portal: 'Pracuj.pl', company: 'Allegro', position: 'React Engineer', salary: '14,000 - 19,000 PLN â€˘ UoP â€˘ Brutto', employmentType: 'UoP', status: 'sent', link: '#' },
+  { id: 3, date: '2024-02-28', portal: 'JustJoin.it', company: 'Netflix', position: 'Senior Web Dev', salary: '30,000 PLN â€˘ B2B â€˘ Netto', employmentType: 'B2B', status: 'rejected', link: '#' },
+  { id: 4, date: '2024-02-25', portal: 'NoFluffJobs', company: 'Revolut', position: 'Software Architect', salary: '25,000 - 35,000 PLN â€˘ B2B â€˘ Netto', employmentType: 'B2B', status: 'offered', link: '#' },
+  { id: 5, date: '2024-02-20', portal: 'OLX', company: 'InPost', position: 'UI Designer', salary: '10,000 - 15,000 PLN â€˘ UZ â€˘ Brutto', employmentType: 'UZ', status: 'sent', link: '#' },
+];
+
+const isStoredStatus = (value: unknown): value is DashboardStatus =>
+  value === 'sent' || value === 'interview' || value === 'rejected' || value === 'offered';
+
+const isStoredEmploymentType = (value: unknown): value is EmploymentType =>
+  value === 'B2B' || value === 'UoP' || value === 'UZ' || value === 'UoD' || value === 'Internship';
+
+const isStoredSeniority = (value: unknown): value is Seniority =>
+  value === 'junior' || value === 'mid' || value === 'senior' || value === 'lead';
+
+const isValidStoredApplication = (value: unknown): value is JobApplication => {
+  if (!value || typeof value !== 'object') return false;
+
+  const candidate = value as Partial<JobApplication>;
+
+  return (
+    typeof candidate.id === 'number' &&
+    typeof candidate.date === 'string' &&
+    typeof candidate.portal === 'string' &&
+    typeof candidate.company === 'string' &&
+    typeof candidate.position === 'string' &&
+    typeof candidate.salary === 'string' &&
+    typeof candidate.link === 'string' &&
+    isStoredStatus(candidate.status) &&
+    isStoredEmploymentType(candidate.employmentType) &&
+    (candidate.seniority === undefined || isStoredSeniority(candidate.seniority))
+  );
+};
+
+const getInitialApplications = (): JobApplication[] => {
+  if (typeof window === 'undefined') return DEFAULT_APPLICATIONS;
+
+  try {
+    const storedApplications = window.localStorage.getItem(DASHBOARD_STORAGE_KEY);
+
+    if (!storedApplications) return DEFAULT_APPLICATIONS;
+
+    const parsedApplications = JSON.parse(storedApplications);
+    if (!Array.isArray(parsedApplications)) return DEFAULT_APPLICATIONS;
+
+    const validApplications = parsedApplications.filter(isValidStoredApplication);
+    return validApplications.length > 0 ? validApplications : DEFAULT_APPLICATIONS;
+  } catch {
+    return DEFAULT_APPLICATIONS;
+  }
 };
 
 function CustomSelect<T extends string>({
@@ -163,17 +227,18 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
   const [formError, setFormError] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [pendingDeleteApps, setPendingDeleteApps] = useState<JobApplication[] | null>(null);
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [bulkStatusValue, setBulkStatusValue] = useState<BulkStatusAction>('placeholder');
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const addFormRef = useRef<HTMLFormElement>(null);
+  const notesModalRef = useRef<HTMLDivElement>(null);
+  const confirmModalRef = useRef<HTMLDivElement>(null);
+  const statusModalRef = useRef<HTMLDivElement>(null);
 
-  const [applications, setApplications] = useState<JobApplication[]>([
-    { id: 1, date: '2024-03-01', portal: 'LinkedIn', company: 'Google', position: 'Frontend Developer', salary: '18,000 - 24,000 PLN • B2B • Netto', employmentType: 'B2B', status: 'interview', link: '#', notes: 'Rekruter: Anna Nowak.' },
-    { id: 2, date: '2024-03-02', portal: 'Pracuj.pl', company: 'Allegro', position: 'React Engineer', salary: '14,000 - 19,000 PLN • UoP • Brutto', employmentType: 'UoP', status: 'sent', link: '#' },
-    { id: 3, date: '2024-02-28', portal: 'JustJoin.it', company: 'Netflix', position: 'Senior Web Dev', salary: '30,000 PLN • B2B • Netto', employmentType: 'B2B', status: 'rejected', link: '#' },
-    { id: 4, date: '2024-02-25', portal: 'NoFluffJobs', company: 'Revolut', position: 'Software Architect', salary: '25,000 - 35,000 PLN • B2B • Netto', employmentType: 'B2B', status: 'offered', link: '#' },
-    { id: 5, date: '2024-02-20', portal: 'OLX', company: 'InPost', position: 'UI Designer', salary: '10,000 - 15,000 PLN • UZ • Brutto', employmentType: 'UZ', status: 'sent', link: '#' },
-  ]);
+  const [applications, setApplications] = useState<JobApplication[]>(getInitialApplications);
 
   const [newApp, setNewApp] = useState<NewApplicationForm>(INITIAL_NEW_APP);
 
@@ -234,6 +299,21 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
       remote: 'Remote',
       hybrid: 'Hybrid',
       onsite: 'Onsite',
+    },
+  };
+
+  const seniorityLabels: Record<DashboardLang, Record<Seniority, string>> = {
+    pl: {
+      junior: 'Junior',
+      mid: 'Mid',
+      senior: 'Senior',
+      lead: 'Lead',
+    },
+    en: {
+      junior: 'Junior',
+      mid: 'Mid',
+      senior: 'Senior',
+      lead: 'Lead',
     },
   };
 
@@ -298,12 +378,24 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     { value: 'onsite', label: workModeLabels[lang].onsite },
   ];
 
+  const seniorityOptions: Array<SelectOption<Seniority>> = [
+    { value: 'junior', label: seniorityLabels[lang].junior },
+    { value: 'mid', label: seniorityLabels[lang].mid },
+    { value: 'senior', label: seniorityLabels[lang].senior },
+    { value: 'lead', label: seniorityLabels[lang].lead },
+  ];
+
   const getStatusOptionClassName = (value: FilterStatus | DashboardStatus) => {
     if (value === 'sent') return 'status-option-sent';
     if (value === 'interview') return 'status-option-interview';
     if (value === 'offered') return 'status-option-offered';
     if (value === 'rejected') return 'status-option-rejected';
     return 'status-option-all';
+  };
+
+  const getBulkStatusOptionClassName = (value: BulkStatusAction) => {
+    if (value === 'placeholder') return 'status-option-all';
+    return getStatusOptionClassName(value);
   };
 
   const cardStatusOptions: Array<SelectOption<DashboardStatus>> = [
@@ -313,12 +405,18 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     { value: 'rejected', label: statusLabels[lang].rejected },
   ];
 
+  const bulkStatusOptions: Array<SelectOption<BulkStatusAction>> = [
+    { value: 'placeholder', label: lang === 'pl' ? 'Zmien status zaznaczonych' : 'Change selected status' },
+    ...cardStatusOptions,
+  ];
+
   const stats = useMemo(
     () => ({
       total: applications.length,
       sent: applications.filter((app) => app.status === 'sent').length,
       interviews: applications.filter((app) => app.status === 'interview').length,
       offered: applications.filter((app) => app.status === 'offered').length,
+      rejected: applications.filter((app) => app.status === 'rejected').length,
     }),
     [applications],
   );
@@ -348,6 +446,21 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     return applications.filter((app) => app.status === modalType);
   }, [applications, modalType]);
 
+  const activeNoteApp = useMemo(() => {
+    if (activeNoteId === null) return null;
+    return applications.find((app) => app.id === activeNoteId) ?? null;
+  }, [activeNoteId, applications]);
+
+  const selectedApplications = useMemo(
+    () => applications.filter((app) => selectedIds.includes(app.id)),
+    [applications, selectedIds],
+  );
+
+  const visibleSelectedCount = useMemo(
+    () => filteredAndSortedApps.filter((app) => selectedIds.includes(app.id)).length,
+    [filteredAndSortedApps, selectedIds],
+  );
+
   const getModalTheme = () => {
     switch (modalType) {
       case 'sent':
@@ -356,6 +469,8 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
         return { title: lang === 'pl' ? 'Zaplanowane rozmowy' : 'Scheduled interviews', color: '#ffaa00' };
       case 'offered':
         return { title: lang === 'pl' ? 'Otrzymane oferty' : 'Job offers', color: '#34d399' };
+      case 'rejected':
+        return { title: lang === 'pl' ? 'Odrzucone aplikacje' : 'Rejected applications', color: '#ff4d4d' };
       default:
         return { title: '', color: '#fff' };
     }
@@ -442,6 +557,26 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     };
   };
 
+  const inferSeniority = (position: string): Seniority => {
+    const normalizedPosition = position.toLowerCase();
+
+    if (normalizedPosition.includes('lead') || normalizedPosition.includes('architect') || normalizedPosition.includes('principal')) {
+      return 'lead';
+    }
+
+    if (normalizedPosition.includes('senior')) {
+      return 'senior';
+    }
+
+    if (normalizedPosition.includes('junior') || normalizedPosition.includes('intern')) {
+      return 'junior';
+    }
+
+    return 'mid';
+  };
+
+  const getSeniority = (app: JobApplication): Seniority => app.seniority ?? inferSeniority(app.position);
+
   const getWorkMode = (app: JobApplication): WorkMode => {
     if (app.workMode) return app.workMode;
     if (app.company === 'Allegro' || app.company === 'Revolut') return 'hybrid';
@@ -456,6 +591,92 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     if (app.status === 'interview') return getRelativeDate(2);
     if (app.status === 'sent') return getRelativeDate(6);
     return '';
+  };
+
+  const getDaysUntil = (date: string) => {
+    if (!date) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const target = new Date(date);
+    target.setHours(0, 0, 0, 0);
+
+    return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const getNextStepBadgeLabel = (app: JobApplication) => {
+    const nextStepDate = getNextStepDate(app);
+    const diff = getDaysUntil(nextStepDate);
+
+    if (diff === null) {
+      return lang === 'pl' ? 'Brak terminu' : 'No due date';
+    }
+
+    if (diff < 0) {
+      return lang === 'pl' ? `${Math.abs(diff)}d po terminie` : `${Math.abs(diff)}d overdue`;
+    }
+
+    if (diff === 0) {
+      return lang === 'pl' ? 'Dzisiaj' : 'Today';
+    }
+
+    return lang === 'pl' ? `Za ${diff}d` : `In ${diff}d`;
+  };
+
+  const getNotesPlaceholder = () =>
+    lang === 'pl'
+      ? 'Dodaj notatki po rozmowie, dane rekrutera lub kolejne kroki...'
+      : 'Add interview notes, recruiter details or next steps...';
+
+  const getNoteTemplates = (app: JobApplication) => {
+    const today = new Intl.DateTimeFormat(lang === 'pl' ? 'pl-PL' : 'en-US', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(new Date());
+
+    return [
+      {
+        label: lang === 'pl' ? 'Rekruter' : 'Recruiter',
+        text:
+          lang === 'pl'
+            ? `[${today}] Kontakt z rekruterem (${app.company})\n- Imie:\n- Ustalenia:\n`
+            : `[${today}] Recruiter contact (${app.company})\n- Name:\n- Notes:\n`,
+      },
+      {
+        label: lang === 'pl' ? 'Rozmowa' : 'Interview',
+        text:
+          lang === 'pl'
+            ? `[${today}] Notatki po rozmowie\n- Pytania:\n- Feedback:\n`
+            : `[${today}] Interview notes\n- Questions:\n- Feedback:\n`,
+      },
+      {
+        label: lang === 'pl' ? 'Follow-up' : 'Follow-up',
+        text:
+          lang === 'pl'
+            ? `[${today}] Kolejny krok\n- Termin:\n- Co przygotowac:\n`
+            : `[${today}] Next step\n- Due date:\n- Prepare:\n`,
+      },
+    ];
+  };
+
+  const shouldCloseOverlay = (
+    event: React.MouseEvent<HTMLDivElement>,
+    modalElement: HTMLDivElement | null,
+  ) => {
+    if (event.target !== event.currentTarget) return false;
+    if (!modalElement) return true;
+
+    const safeDistance = 64;
+    const rect = modalElement.getBoundingClientRect();
+    const { clientX, clientY } = event;
+
+    const dx = Math.max(rect.left - clientX, 0, clientX - rect.right);
+    const dy = Math.max(rect.top - clientY, 0, clientY - rect.bottom);
+    const distanceToModal = Math.hypot(dx, dy);
+
+    return distanceToModal > safeDistance;
   };
 
   const upcomingReminders = useMemo(() => {
@@ -473,11 +694,18 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     setFormError('');
   };
 
-  const showToast = (message: string, tone: ToastState['tone'] = 'info') => {
+  const showToast = (
+    message: string,
+    tone: ToastState['tone'] = 'info',
+    options?: Omit<Partial<ToastState>, 'id' | 'message' | 'tone'>,
+  ) => {
     setToast({
       id: Date.now(),
       message,
       tone,
+      actionLabel: options?.actionLabel,
+      durationMs: options?.durationMs,
+      onAction: options?.onAction,
     });
   };
 
@@ -486,6 +714,34 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     setEditingId(null);
     setFormError('');
     setIsFormOpen(true);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
+  const toggleSelectionMode = () => {
+    setIsSelectionMode((prev) => {
+      if (prev) {
+        clearSelection();
+      }
+
+      return !prev;
+    });
+  };
+
+  const toggleSelectedApplication = (id: number) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((selectedId) => selectedId !== id) : [...prev, id],
+    );
+  };
+
+  const selectVisibleApplications = () => {
+    setSelectedIds((prev) => {
+      const nextIds = new Set(prev);
+      filteredAndSortedApps.forEach((app) => nextIds.add(app.id));
+      return Array.from(nextIds);
+    });
   };
 
   const handleAddApplication = (e: React.FormEvent) => {
@@ -527,6 +783,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                 salaryMode: newApp.salaryMode,
                 employmentType: newApp.employmentType,
                 workMode: newApp.workMode,
+                seniority: newApp.seniority,
                 nextStepDate: newApp.nextStepDate,
                 link: newApp.link || '#',
                 salary: `${formatSalary(newApp.salaryFrom, newApp.salaryTo, newApp.currency)} • ${newApp.employmentType} • ${salaryModeLabels[lang][newApp.salaryMode]}`,
@@ -555,6 +812,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
       salaryMode: newApp.salaryMode,
       employmentType: newApp.employmentType,
       workMode: newApp.workMode,
+      seniority: newApp.seniority,
       nextStepDate: newApp.nextStepDate,
       link: newApp.link || '#',
       salary: `${formatSalary(newApp.salaryFrom, newApp.salaryTo, newApp.currency)} • ${newApp.employmentType} • ${salaryModeLabels[lang][newApp.salaryMode]}`,
@@ -583,29 +841,113 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     );
   };
 
+  const handleBulkStatusChange = (newStatus: DashboardStatus) => {
+    if (selectedIds.length === 0) return;
+
+    setApplications((prev) =>
+      prev.map((app) => (selectedIds.includes(app.id) ? { ...app, status: newStatus } : app)),
+    );
+
+    showToast(
+      lang === 'pl'
+        ? `Zmieniono status ${selectedIds.length} ofert na ${statusLabels.pl[newStatus].toLowerCase()}.`
+        : `Updated ${selectedIds.length} applications to ${statusLabels.en[newStatus].toLowerCase()}.`,
+      'info',
+    );
+  };
+
+  const handleBulkStatusSelect = (value: BulkStatusAction) => {
+    setBulkStatusValue(value);
+
+    if (value === 'placeholder') return;
+
+    handleBulkStatusChange(value);
+    setBulkStatusValue('placeholder');
+  };
+
   const handleNoteUpdate = (id: number, text: string) => {
     setApplications((prev) =>
       prev.map((app) => (app.id === id ? { ...app, notes: text } : app)),
     );
   };
 
-  const handleDeleteApplication = (id: number) => {
-    const shouldDelete = window.confirm(
-      lang === 'pl'
-        ? 'Czy na pewno chcesz usunac te oferte?'
-        : 'Do you really want to delete this job?',
+  const appendNoteTemplate = (id: number, template: string) => {
+    setApplications((prev) =>
+      prev.map((app) => {
+        if (app.id !== id) return app;
+
+        const currentNote = app.notes?.trim() ?? '';
+        const joinedNote = currentNote ? `${currentNote}\n\n${template.trimEnd()}` : template.trimEnd();
+
+        return {
+          ...app,
+          notes: joinedNote,
+        };
+      }),
     );
+  };
 
-    if (!shouldDelete) return;
+  const handleDeleteApplication = (id: number) => {
+    const targetApp = applications.find((app) => app.id === id);
+    if (!targetApp) return;
 
-    setApplications((prev) => prev.filter((app) => app.id !== id));
-    setActiveNoteId((prev) => (prev === id ? null : prev));
-    showToast(lang === 'pl' ? 'Oferta zostala usunieta.' : 'Application deleted.', 'error');
+    setPendingDeleteApps([targetApp]);
+  };
 
-    if (editingId === id) {
+  const handleBulkDeleteApplications = () => {
+    if (selectedApplications.length === 0) return;
+
+    setPendingDeleteApps(selectedApplications);
+  };
+
+  const confirmDeleteApplication = () => {
+    if (!pendingDeleteApps || pendingDeleteApps.length === 0) return;
+
+    const deletedEntries = pendingDeleteApps.map((app) => ({
+      app,
+      index: applications.findIndex((item) => item.id === app.id),
+    }));
+    const deletedIds = deletedEntries.map((entry) => entry.app.id);
+    const deletedCount = deletedEntries.length;
+
+    setApplications((prev) => prev.filter((app) => !deletedIds.includes(app.id)));
+    setSelectedIds((prev) => prev.filter((id) => !deletedIds.includes(id)));
+    setActiveNoteId((prev) => (prev !== null && deletedIds.includes(prev) ? null : prev));
+    showToast(deletedCount === 1
+      ? lang === 'pl' ? 'Oferta zostala usunieta.' : 'Application deleted.'
+      : lang === 'pl' ? `Usunieto ${deletedCount} ofert.` : `Deleted ${deletedCount} applications.`, 'error', {
+      actionLabel: lang === 'pl' ? 'Cofnij' : 'Undo',
+      durationMs: 5200,
+      onAction: () => {
+        setApplications((prev) => {
+          const restored = [...prev];
+
+          deletedEntries
+            .slice()
+            .sort((a, b) => a.index - b.index)
+            .forEach(({ app, index }) => {
+              if (restored.some((item) => item.id === app.id)) return;
+              restored.splice(index >= 0 ? index : restored.length, 0, app);
+            });
+
+          return restored;
+        });
+
+        showToast(
+          deletedCount === 1
+            ? lang === 'pl' ? 'Oferta zostala przywrocona.' : 'Application restored.'
+            : lang === 'pl' ? `Przywrocono ${deletedCount} ofert.` : `Restored ${deletedCount} applications.`,
+          'success',
+        );
+      },
+    });
+
+    if (editingId !== null && deletedIds.includes(editingId)) {
       setIsFormOpen(false);
       resetForm();
     }
+
+    setPendingDeleteApps(null);
   };
 
   const handleEditApplication = (app: JobApplication) => {
@@ -624,6 +966,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
       employmentType: app.employmentType ?? parsedSalary.employmentType,
       salaryMode: app.salaryMode ?? parsedSalary.salaryMode,
       workMode: getWorkMode(app),
+      seniority: getSeniority(app),
       nextStepDate: getNextStepDate(app),
       link: app.link === '#' ? '' : app.link,
     });
@@ -662,19 +1005,50 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
 
     addFormRef.current.scrollIntoView({
       behavior: 'smooth',
-      block: 'nearest',
+      block: 'center',
     });
   }, [isFormOpen, editingId]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DASHBOARD_STORAGE_KEY, JSON.stringify(applications));
+  }, [applications]);
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => applications.some((app) => app.id === id)));
+  }, [applications]);
 
   useEffect(() => {
     if (!toast) return;
 
     const timer = window.setTimeout(() => {
       setToast(null);
-    }, 2800);
+    }, toast.durationMs ?? 2800);
 
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      if (activeNoteId !== null) {
+        setActiveNoteId(null);
+        return;
+      }
+
+      if (pendingDeleteApps) {
+        setPendingDeleteApps(null);
+        return;
+      }
+
+      if (modalType) {
+        setModalType(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [activeNoteId, modalType, pendingDeleteApps]);
 
   const theme = getModalTheme();
 
@@ -698,6 +1072,20 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
           <div className={`toast-alert ${toast.tone}`} key={toast.id}>
             <span className="toast-indicator" aria-hidden="true"></span>
             <span className="toast-message">{toast.message}</span>
+            {toast.actionLabel && toast.onAction && (
+              <button
+                type="button"
+                className="toast-action-btn"
+                onClick={() => {
+                  const action = toast.onAction;
+                  if (!action) return;
+                  setToast(null);
+                  action();
+                }}
+              >
+                {toast.actionLabel}
+              </button>
+            )}
             <button type="button" className="toast-close-btn" onClick={() => setToast(null)} aria-label="Close toast">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18" />
@@ -871,6 +1259,17 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
             <span className="summary-label">{statusLabels[lang].offered}:</span>
             <span className="summary-value">{stats.offered}</span>
           </div>
+
+          <div
+            className="summary-item rejected clickable"
+            onClick={() => stats.rejected > 0 && setModalType('rejected')}
+            onMouseEnter={() => setIsHintActive(true)}
+            onMouseLeave={() => setIsHintActive(false)}
+          >
+            <span className="summary-dot"></span>
+            <span className="summary-label">{statusLabels[lang].rejected}:</span>
+            <span className="summary-value">{stats.rejected}</span>
+          </div>
         </div>
 
         <div className="dashboard-controls">
@@ -931,8 +1330,51 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
             >
               {isFormOpen && editingId === null ? 'X' : lang === 'pl' ? '+ Dodaj' : '+ Add'}
             </button>
+
+            <button
+              type="button"
+              className={`bulk-mode-btn ${isSelectionMode ? 'active' : ''}`}
+              onClick={toggleSelectionMode}
+            >
+              {isSelectionMode
+                ? lang === 'pl' ? 'Zakoncz zaznaczanie' : 'Exit selection'
+                : lang === 'pl' ? 'Zaznacz wiele' : 'Select multiple'}
+            </button>
           </div>
         </div>
+
+        {isSelectionMode && (
+          <div className={`bulk-actions-bar fade-in ${selectedIds.length > 0 ? 'has-selection' : ''}`}>
+            <div className="bulk-actions-copy">
+              <span className="bulk-actions-kicker">{lang === 'pl' ? 'Akcje zbiorcze' : 'Bulk actions'}</span>
+              <p>
+                {lang === 'pl'
+                  ? `Zaznaczono ${selectedIds.length} ofert. Widocznych zaznaczen: ${visibleSelectedCount}.`
+                  : `${selectedIds.length} applications selected. Visible selected: ${visibleSelectedCount}.`}
+              </p>
+            </div>
+
+            <div className="bulk-actions-buttons">
+              <button type="button" className="bulk-action-btn highlight" onClick={selectVisibleApplications}>
+                {lang === 'pl' ? 'Zaznacz widoczne' : 'Select visible'}
+              </button>
+              <button type="button" className="bulk-action-btn" onClick={clearSelection}>
+                {lang === 'pl' ? 'Wyczysc' : 'Clear'}
+              </button>
+              <CustomSelect
+                value={bulkStatusValue}
+                options={bulkStatusOptions}
+                onChange={handleBulkStatusSelect}
+                className={`bulk-status-select ${selectedIds.length === 0 ? 'disabled' : ''}`}
+                align="right"
+                getOptionClassName={getBulkStatusOptionClassName}
+              />
+              <button type="button" className="bulk-action-btn danger" disabled={selectedIds.length === 0} onClick={handleBulkDeleteApplications}>
+                {lang === 'pl' ? 'Usun zaznaczone' : 'Delete selected'}
+              </button>
+            </div>
+          </div>
+        )}
 
         {isFormOpen && (
           <form ref={addFormRef} className="add-job-form fade-in" onSubmit={handleAddApplication}>
@@ -995,6 +1437,16 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                   value={newApp.workMode}
                   options={workModeOptions}
                   onChange={(value) => setNewApp({ ...newApp, workMode: value })}
+                  className="form-select"
+                />
+              </label>
+
+              <label className="form-field">
+                <span className="form-label">{lang === 'pl' ? 'Poziom' : 'Seniority'}</span>
+                <CustomSelect
+                  value={newApp.seniority}
+                  options={seniorityOptions}
+                  onChange={(value) => setNewApp({ ...newApp, seniority: value })}
                   className="form-select"
                 />
               </label>
@@ -1110,11 +1562,25 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
             return (
             <div
               key={app.id}
-              className={`job-card ${app.status} fade-in-stagger`}
+              className={`job-card ${app.status} ${selectedIds.includes(app.id) ? 'selected' : ''} fade-in-stagger`}
               style={{ animationDelay: `${index * 0.05}s` }}
             >
               <div className="card-topbar">
-                <span className={`card-status-pill ${app.status}`}>{statusLabels[lang][app.status]}</span>
+                <div className="card-topbar-left">
+                  {isSelectionMode && (
+                    <button
+                      type="button"
+                      className={`card-select-toggle ${selectedIds.includes(app.id) ? 'selected' : ''}`}
+                      onClick={() => toggleSelectedApplication(app.id)}
+                      aria-label={lang === 'pl' ? 'Zaznacz oferte' : 'Select application'}
+                    >
+                      <span className="card-select-toggle-mark" aria-hidden="true">
+                        {selectedIds.includes(app.id) ? '✓' : ''}
+                      </span>
+                    </button>
+                  )}
+                  <span className={`card-status-pill ${app.status}`}>{statusLabels[lang][app.status]}</span>
+                </div>
 
                 <div className="card-actions-overlay">
                   <button
@@ -1122,6 +1588,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                     className="edit-card-btn"
                     onClick={() => handleEditApplication(app)}
                     aria-label={lang === 'pl' ? 'Edytuj oferte' : 'Edit job'}
+                    data-tooltip={lang === 'pl' ? 'Edytuj oferte' : 'Edit application'}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" /></svg>
                   </button>
@@ -1131,6 +1598,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                     className="remove-card-btn"
                     onClick={() => handleDeleteApplication(app.id)}
                     aria-label={lang === 'pl' ? 'Usun oferte' : 'Delete job'}
+                    data-tooltip={lang === 'pl' ? 'Usun oferte' : 'Delete application'}
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                   </button>
@@ -1139,6 +1607,8 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                     type="button"
                     className={`note-toggle-btn ${app.notes ? 'has-note' : ''} ${activeNoteId === app.id ? 'open' : ''}`}
                     onClick={() => setActiveNoteId(activeNoteId === app.id ? null : app.id)}
+                    aria-label={lang === 'pl' ? 'Pokaz notatki' : 'Show notes'}
+                    data-tooltip={lang === 'pl' ? 'Pokaz notatki' : 'Show notes'}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -1146,7 +1616,14 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                     </svg>
                   </button>
 
-                  <a href={app.link} className="link-icon" target="_blank" rel="noreferrer">
+                  <a
+                    href={app.link}
+                    className="link-icon"
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={lang === 'pl' ? 'Otworz oferte' : 'Open application'}
+                    data-tooltip={lang === 'pl' ? 'Otworz oferte' : 'Open application'}
+                  >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                       <polyline points="15 3 21 3 21 9" />
@@ -1178,6 +1655,7 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                 <div className="card-tags">
                   <span className="card-tag">{workModeLabels[lang][getWorkMode(app)]}</span>
                   <span className="card-tag subtle">{employmentLabels[lang][app.employmentType]}</span>
+                  <span className="card-tag accent">{seniorityLabels[lang][getSeniority(app)]}</span>
                 </div>
               </div>
 
@@ -1207,25 +1685,182 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
                 />
               </div>
 
-              {activeNoteId === app.id && (
-                <div className="card-notes-expansion notes-expansion-container fade-in">
-                  <textarea
-                    className="notes-textarea"
-                    value={app.notes || ''}
-                    onChange={(e) => handleNoteUpdate(app.id, e.target.value)}
-                    placeholder="..."
-                  />
-                </div>
-              )}
             </div>
           );
           })}
         </div>
 
+        {activeNoteApp &&
+          createPortal(
+            <div
+              className="modal-overlay fade-in"
+              onClick={(e) => {
+                if (shouldCloseOverlay(e, notesModalRef.current)) {
+                  setActiveNoteId(null);
+                }
+              }}
+            >
+              <div ref={notesModalRef} className="notes-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="notes-modal-header">
+                  <div className="notes-modal-main">
+                    <span className="notes-modal-logo">
+                      <img src={getPortalIcon(activeNoteApp.portal)} alt={activeNoteApp.portal} className="notes-modal-logo-image" />
+                    </span>
+                    <div className="notes-modal-copy">
+                      <span className="notes-kicker">{lang === 'pl' ? 'Prywatne notatki' : 'Private notes'}</span>
+                      <h3>{activeNoteApp.company}</h3>
+                      <p>
+                        {activeNoteApp.position} · {activeNoteApp.portal}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="notes-modal-actions">
+                    <div className="notes-meta">
+                      <span className="notes-saved-badge">{lang === 'pl' ? 'Auto zapis' : 'Auto save'}</span>
+                      {getNextStepDate(activeNoteApp) && (
+                        <span className="notes-deadline-badge">{getNextStepBadgeLabel(activeNoteApp)}</span>
+                      )}
+                    </div>
+                    <button type="button" className="close-modal" onClick={() => setActiveNoteId(null)}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="notes-modal-body">
+                  <p className="notes-helper notes-modal-helper">
+                    {lang === 'pl'
+                      ? 'Zapis odbywa sie automatycznie. Zbieraj ustalenia z rekruterem, feedback po rozmowie i kolejne kroki w jednym miejscu.'
+                      : 'Saved automatically. Capture recruiter context, interview feedback and next steps in one place.'}
+                  </p>
+
+                  <div className="note-shortcuts">
+                    {getNoteTemplates(activeNoteApp).map((template) => (
+                      <button
+                        key={template.label}
+                        type="button"
+                        className="note-shortcut-btn"
+                        onClick={() => appendNoteTemplate(activeNoteApp.id, template.text)}
+                      >
+                        + {template.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <textarea
+                    className="notes-textarea notes-textarea-modal"
+                    value={activeNoteApp.notes || ''}
+                    onChange={(e) => handleNoteUpdate(activeNoteApp.id, e.target.value)}
+                    placeholder={getNotesPlaceholder()}
+                  />
+
+                  <div className="notes-footer">
+                    <span className="notes-count">
+                      {(activeNoteApp.notes || '').trim().length} {lang === 'pl' ? 'znakow' : 'chars'}
+                    </span>
+                    <span className="notes-status-copy">
+                      {lang === 'pl' ? 'Widoczne tylko w Twoim demo dashboardzie.' : 'Visible only in your demo dashboard.'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
+        {pendingDeleteApps && pendingDeleteApps.length > 0 &&
+          createPortal(
+            <div
+              className="modal-overlay fade-in"
+              onClick={(e) => {
+                if (shouldCloseOverlay(e, confirmModalRef.current)) {
+                  setPendingDeleteApps(null);
+                }
+              }}
+            >
+              <div ref={confirmModalRef} className="confirm-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="confirm-modal-icon" aria-hidden="true">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+                    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    <line x1="10" y1="11" x2="10" y2="17" />
+                    <line x1="14" y1="11" x2="14" y2="17" />
+                  </svg>
+                </div>
+
+                <div className="confirm-modal-copy">
+                  <span className="confirm-kicker">{lang === 'pl' ? 'Potwierdzenie' : 'Confirmation'}</span>
+                  <h3>
+                    {pendingDeleteApps.length === 1
+                      ? lang === 'pl' ? 'Usunac te oferte?' : 'Delete this application?'
+                      : lang === 'pl' ? `Usunac ${pendingDeleteApps.length} ofert?` : `Delete ${pendingDeleteApps.length} applications?`}
+                  </h3>
+                  <p>
+                    {pendingDeleteApps.length === 1
+                      ? lang === 'pl'
+                        ? `Oferta ${pendingDeleteApps[0].company} - ${pendingDeleteApps[0].position} zostanie usunieta z dashboardu.`
+                        : `${pendingDeleteApps[0].company} - ${pendingDeleteApps[0].position} will be removed from your dashboard.`
+                      : lang === 'pl'
+                        ? 'Wszystkie zaznaczone oferty zostana usuniete z dashboardu.'
+                        : 'All selected applications will be removed from your dashboard.'}
+                  </p>
+                </div>
+
+                <div className="confirm-modal-card">
+                  {pendingDeleteApps.length === 1 ? (
+                    <>
+                      <span className="confirm-modal-company">{pendingDeleteApps[0].company}</span>
+                      <span className="confirm-modal-position">{pendingDeleteApps[0].position}</span>
+                      <span className="confirm-modal-portal">{pendingDeleteApps[0].portal}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="confirm-modal-company">
+                        {lang === 'pl'
+                          ? `${pendingDeleteApps.length} zaznaczonych ofert`
+                          : `${pendingDeleteApps.length} selected applications`}
+                      </span>
+                      <span className="confirm-modal-position">
+                        {pendingDeleteApps
+                          .slice(0, 3)
+                          .map((app) => app.company)
+                          .join(', ')}
+                        {pendingDeleteApps.length > 3 ? '...' : ''}
+                      </span>
+                      <span className="confirm-modal-portal">
+                        {lang === 'pl' ? 'Akcja grupowa' : 'Bulk action'}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="confirm-modal-actions">
+                  <button type="button" className="form-secondary-btn" onClick={() => setPendingDeleteApps(null)}>
+                    {lang === 'pl' ? 'Anuluj' : 'Cancel'}
+                  </button>
+                  <button type="button" className="confirm-delete-btn" onClick={confirmDeleteApplication}>
+                    {lang === 'pl' ? 'Usun oferte' : 'Delete job'}
+                  </button>
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )}
+
         {modalType &&
           createPortal(
-            <div className="modal-overlay fade-in" onClick={() => setModalType(null)}>
+            <div
+              className="modal-overlay fade-in"
+              onClick={(e) => {
+                if (shouldCloseOverlay(e, statusModalRef.current)) {
+                  setModalType(null);
+                }
+              }}
+            >
               <div
+                ref={statusModalRef}
                 className="interview-modal"
                 onClick={(e) => e.stopPropagation()}
                 style={{ borderColor: theme.color }}
