@@ -1,217 +1,34 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+
 import './Dashboard.css';
-
-interface JobApplication {
-  id: number;
-  date: string;
-  portal: string;
-  company: string;
-  position: string;
-  salary: string;
-  salaryFrom?: string;
-  salaryTo?: string;
-  currency?: SalaryCurrency;
-  salaryMode?: SalaryMode;
-  employmentType: EmploymentType;
-  workMode?: WorkMode;
-  seniority?: Seniority;
-  nextStepDate?: string;
-  status: 'sent' | 'interview' | 'rejected' | 'offered';
-  link: string;
-  notes?: string;
-}
-
-interface DashboardProps {
-  lang: 'pl' | 'en';
-  setLang: (lang: 'pl' | 'en') => void;
-  onBack: () => void;
-}
-
-interface SelectOption<T extends string> {
-  value: T;
-  label: string;
-}
-
-interface CustomSelectProps<T extends string> {
-  value: T;
-  options: Array<SelectOption<T>>;
-  onChange: (value: T) => void;
-  className?: string;
-  align?: 'left' | 'right';
-  getOptionClassName?: (value: T) => string;
-}
-
-type DashboardStatus = JobApplication['status'];
-type DashboardLang = DashboardProps['lang'];
-type SalaryCurrency = 'PLN' | 'EUR' | 'USD' | 'GBP' | 'CHF';
-type EmploymentType = 'B2B' | 'UoP' | 'UZ' | 'UoD' | 'Internship';
-type SalaryMode = 'net' | 'gross';
-type WorkMode = 'remote' | 'hybrid' | 'onsite';
-type Seniority = 'junior' | 'mid' | 'senior' | 'lead';
-type BulkStatusAction = DashboardStatus | 'placeholder';
-type FilterStatus = 'all' | DashboardStatus;
-type FilterPortal = 'all' | string;
-type FilterEmployment = 'all' | EmploymentType;
-
-interface NewApplicationForm {
-  company: string;
-  position: string;
-  portal: string;
-  salaryFrom: string;
-  salaryTo: string;
-  currency: SalaryCurrency;
-  employmentType: EmploymentType;
-  salaryMode: SalaryMode;
-  workMode: WorkMode;
-  seniority: Seniority;
-  nextStepDate: string;
-  link: string;
-}
-
-interface ToastState {
-  id: number;
-  message: string;
-  tone: 'success' | 'info' | 'error';
-  actionLabel?: string;
-  durationMs?: number;
-  onAction?: () => void;
-}
-
-const DASHBOARD_STORAGE_KEY = 'job-tracker-demo-applications-v1';
-
-const INITIAL_NEW_APP: NewApplicationForm = {
-  company: '',
-  position: '',
-  portal: 'LinkedIn',
-  salaryFrom: '',
-  salaryTo: '',
-  currency: 'PLN',
-  employmentType: 'B2B',
-  salaryMode: 'net',
-  workMode: 'remote',
-  seniority: 'mid',
-  nextStepDate: '',
-  link: '',
-};
-
-const DEFAULT_APPLICATIONS: JobApplication[] = [
-  { id: 1, date: '2024-03-01', portal: 'LinkedIn', company: 'Google', position: 'Frontend Developer', salary: '18,000 - 24,000 PLN â€˘ B2B â€˘ Netto', employmentType: 'B2B', status: 'interview', link: '#', notes: 'Rekruter: Anna Nowak.' },
-  { id: 2, date: '2024-03-02', portal: 'Pracuj.pl', company: 'Allegro', position: 'React Engineer', salary: '14,000 - 19,000 PLN â€˘ UoP â€˘ Brutto', employmentType: 'UoP', status: 'sent', link: '#' },
-  { id: 3, date: '2024-02-28', portal: 'JustJoin.it', company: 'Netflix', position: 'Senior Web Dev', salary: '30,000 PLN â€˘ B2B â€˘ Netto', employmentType: 'B2B', status: 'rejected', link: '#' },
-  { id: 4, date: '2024-02-25', portal: 'NoFluffJobs', company: 'Revolut', position: 'Software Architect', salary: '25,000 - 35,000 PLN â€˘ B2B â€˘ Netto', employmentType: 'B2B', status: 'offered', link: '#' },
-  { id: 5, date: '2024-02-20', portal: 'OLX', company: 'InPost', position: 'UI Designer', salary: '10,000 - 15,000 PLN â€˘ UZ â€˘ Brutto', employmentType: 'UZ', status: 'sent', link: '#' },
-];
-
-const isStoredStatus = (value: unknown): value is DashboardStatus =>
-  value === 'sent' || value === 'interview' || value === 'rejected' || value === 'offered';
-
-const isStoredEmploymentType = (value: unknown): value is EmploymentType =>
-  value === 'B2B' || value === 'UoP' || value === 'UZ' || value === 'UoD' || value === 'Internship';
-
-const isStoredSeniority = (value: unknown): value is Seniority =>
-  value === 'junior' || value === 'mid' || value === 'senior' || value === 'lead';
-
-const isValidStoredApplication = (value: unknown): value is JobApplication => {
-  if (!value || typeof value !== 'object') return false;
-
-  const candidate = value as Partial<JobApplication>;
-
-  return (
-    typeof candidate.id === 'number' &&
-    typeof candidate.date === 'string' &&
-    typeof candidate.portal === 'string' &&
-    typeof candidate.company === 'string' &&
-    typeof candidate.position === 'string' &&
-    typeof candidate.salary === 'string' &&
-    typeof candidate.link === 'string' &&
-    isStoredStatus(candidate.status) &&
-    isStoredEmploymentType(candidate.employmentType) &&
-    (candidate.seniority === undefined || isStoredSeniority(candidate.seniority))
-  );
-};
-
-const getInitialApplications = (): JobApplication[] => {
-  if (typeof window === 'undefined') return DEFAULT_APPLICATIONS;
-
-  try {
-    const storedApplications = window.localStorage.getItem(DASHBOARD_STORAGE_KEY);
-
-    if (!storedApplications) return DEFAULT_APPLICATIONS;
-
-    const parsedApplications = JSON.parse(storedApplications);
-    if (!Array.isArray(parsedApplications)) return DEFAULT_APPLICATIONS;
-
-    const validApplications = parsedApplications.filter(isValidStoredApplication);
-    return validApplications.length > 0 ? validApplications : DEFAULT_APPLICATIONS;
-  } catch {
-    return DEFAULT_APPLICATIONS;
-  }
-};
-
-function CustomSelect<T extends string>({
-  value,
-  options,
-  onChange,
-  className = '',
-  align = 'left',
-  getOptionClassName,
-}: CustomSelectProps<T>) {
-  const [isOpen, setIsOpen] = useState(false);
-  const selectRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (selectRef.current && !selectRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const selectedOption = options.find((option) => option.value === value) ?? options[0];
-
-  return (
-    <div
-      ref={selectRef}
-      className={`custom-select ${isOpen ? 'open' : ''} ${align === 'right' ? 'align-right' : ''} ${className}`.trim()}
-    >
-      <button
-        type="button"
-        className="custom-select-trigger"
-        onClick={() => setIsOpen((prev) => !prev)}
-      >
-        <span className="custom-select-value">{selectedOption.label}</span>
-        <span className="custom-select-chevron" aria-hidden="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-      </button>
-
-      {isOpen && (
-        <div className="custom-select-menu">
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`custom-select-option ${option.value === value ? 'selected' : ''} ${getOptionClassName ? getOptionClassName(option.value) : ''}`.trim()}
-              onClick={() => {
-                onChange(option.value);
-                setIsOpen(false);
-              }}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
+import { CustomSelect } from './dashboard/components/CustomSelect';
+import { DASHBOARD_STORAGE_KEY, INITIAL_NEW_APP, getInitialApplications } from './dashboard/data';
+import {
+  getPortalIcon,
+  getSeniority,
+  getWorkMode,
+  sanitizeAmountInput,
+  shouldCloseOverlay,
+} from './dashboard/utils';
+import type {
+  BulkStatusAction,
+  DashboardLang,
+  DashboardProps,
+  DashboardStatus,
+  EmploymentType,
+  FilterEmployment,
+  FilterPortal,
+  FilterStatus,
+  JobApplication,
+  NewApplicationForm,
+  SalaryCurrency,
+  SalaryMode,
+  Seniority,
+  SelectOption,
+  ToastState,
+  WorkMode,
+} from './dashboard/types';
 const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
@@ -557,33 +374,6 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     };
   };
 
-  const inferSeniority = (position: string): Seniority => {
-    const normalizedPosition = position.toLowerCase();
-
-    if (normalizedPosition.includes('lead') || normalizedPosition.includes('architect') || normalizedPosition.includes('principal')) {
-      return 'lead';
-    }
-
-    if (normalizedPosition.includes('senior')) {
-      return 'senior';
-    }
-
-    if (normalizedPosition.includes('junior') || normalizedPosition.includes('intern')) {
-      return 'junior';
-    }
-
-    return 'mid';
-  };
-
-  const getSeniority = (app: JobApplication): Seniority => app.seniority ?? inferSeniority(app.position);
-
-  const getWorkMode = (app: JobApplication): WorkMode => {
-    if (app.workMode) return app.workMode;
-    if (app.company === 'Allegro' || app.company === 'Revolut') return 'hybrid';
-    if (app.company === 'InPost') return 'onsite';
-    return 'remote';
-  };
-
   const getNextStepDate = (app: JobApplication) => {
     if (app.nextStepDate) return app.nextStepDate;
     if (app.company === 'Google') return getRelativeDate(1);
@@ -661,32 +451,12 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
     ];
   };
 
-  const shouldCloseOverlay = (
-    event: React.MouseEvent<HTMLDivElement>,
-    modalElement: HTMLDivElement | null,
-  ) => {
-    if (event.target !== event.currentTarget) return false;
-    if (!modalElement) return true;
-
-    const safeDistance = 64;
-    const rect = modalElement.getBoundingClientRect();
-    const { clientX, clientY } = event;
-
-    const dx = Math.max(rect.left - clientX, 0, clientX - rect.right);
-    const dy = Math.max(rect.top - clientY, 0, clientY - rect.bottom);
-    const distanceToModal = Math.hypot(dx, dy);
-
-    return distanceToModal > safeDistance;
-  };
-
   const upcomingReminders = useMemo(() => {
     return applications
       .filter((app) => getNextStepDate(app))
       .sort((a, b) => new Date(getNextStepDate(a)).getTime() - new Date(getNextStepDate(b)).getTime())
       .slice(0, 3);
   }, [applications]);
-
-  const sanitizeAmountInput = (value: string) => value.replace(/[^\d]/g, '');
 
   const resetForm = () => {
     setNewApp(INITIAL_NEW_APP);
@@ -970,18 +740,6 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
       nextStepDate: getNextStepDate(app),
       link: app.link === '#' ? '' : app.link,
     });
-  };
-
-  const getPortalIcon = (portal: string) => {
-    const normalizedPortal = portal.toLowerCase();
-
-    if (normalizedPortal.includes('linkedin')) return 'https://www.google.com/s2/favicons?domain=linkedin.com&sz=64';
-    if (normalizedPortal.includes('pracuj')) return 'https://www.google.com/s2/favicons?domain=pracuj.pl&sz=64';
-    if (normalizedPortal.includes('olx')) return 'https://www.google.com/s2/favicons?domain=olx.pl&sz=64';
-    if (normalizedPortal.includes('justjoin')) return 'https://www.google.com/s2/favicons?domain=justjoin.it&sz=64';
-    if (normalizedPortal.includes('nofluff')) return 'https://www.google.com/s2/favicons?domain=nofluffjobs.com&sz=64';
-
-    return 'https://www.google.com/s2/favicons?sz=64';
   };
 
   const handleExit = () => {
@@ -1347,11 +1105,19 @@ const Dashboard: React.FC<DashboardProps> = ({ lang, setLang, onBack }) => {
           <div className={`bulk-actions-bar fade-in ${selectedIds.length > 0 ? 'has-selection' : ''}`}>
             <div className="bulk-actions-copy">
               <span className="bulk-actions-kicker">{lang === 'pl' ? 'Akcje zbiorcze' : 'Bulk actions'}</span>
-              <p>
-                {lang === 'pl'
-                  ? `Zaznaczono ${selectedIds.length} ofert. Widocznych zaznaczen: ${visibleSelectedCount}.`
-                  : `${selectedIds.length} applications selected. Visible selected: ${visibleSelectedCount}.`}
-              </p>
+             <p>
+              {lang === 'pl' ? (
+                <>
+                  Zaznaczono <span className="bulk-count">{selectedIds.length}</span> ofert.
+                  Widocznych zaznaczeń: <span className="bulk-count">{visibleSelectedCount}</span>.
+                </>
+              ) : (
+                <>
+                  <span className="bulk-count">{selectedIds.length}</span> applications selected.
+                  Visible selected: <span className="bulk-count">{visibleSelectedCount}</span>.
+                </>
+              )}
+            </p>
             </div>
 
             <div className="bulk-actions-buttons">

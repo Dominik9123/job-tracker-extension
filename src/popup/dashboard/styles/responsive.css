@@ -1,0 +1,220 @@
+/* ==========================================================================
+   16. RESPONSYWNOŒÆ
+   ========================================================================== */
+@media (max-width: 920px) {
+  .dashboard-container {
+    padding: 18px 20px 36px;
+  }
+
+  .toast-alert {
+    top: 16px;
+    left: 50%;
+    width: min(calc(100vw - 24px), 420px);
+  }
+
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-right {
+    justify-content: space-between;
+  }
+
+  .summary-bar {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .reminder-list {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-group {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .filter-group .custom-select,
+  .filter-group select,
+  .add-job-btn,
+  .bulk-mode-btn {
+    flex: 1 1 180px;
+  }
+
+  .bulk-actions-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bulk-actions-buttons {
+    justify-content: flex-start;
+  }
+
+  .salary-range-group {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .form-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reminder-strip-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .salary-range-separator {
+    display: none;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .toast-alert {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .toast-message {
+    min-width: 100%;
+    text-align: center;
+  }
+
+  .dashboard-logo {
+    font-size: 1.6rem;
+  }
+
+  .welcome-title {
+    font-size: 1.8rem;
+  }
+
+  .summary-bar {
+    padding: 16px 18px;
+  }
+
+  .applications-grid {
+    gap: 18px;
+  }
+
+  .reminder-card,
+  .reminder-card-meta {
+    align-items: flex-start;
+  }
+
+  .filter-group {
+    width: 100%;
+  }
+
+  .bulk-actions-buttons {
+    width: 100%;
+  }
+
+  .bulk-action-btn,
+  .bulk-mode-btn,
+  .bulk-status-select {
+    width: 100%;
+  }
+
+  .card-footer,
+  .card-header,
+  .modal-job-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .modal-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .modal-header-actions {
+    justify-content: space-between;
+  }
+
+  .modal-job-meta {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .confirm-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .confirm-delete-btn {
+    width: 100%;
+  }
+
+  .card-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .card-tags {
+    margin-top: 12px;
+  }
+
+  .notes-panel-header,
+  .notes-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .notes-meta {
+    justify-content: flex-start;
+  }
+
+  .notes-modal-header,
+  .notes-modal-main,
+  .notes-modal-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .notes-modal {
+    max-height: min(90vh, 860px);
+  }
+
+  .notes-modal-header,
+  .notes-modal-body {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .notes-textarea-modal {
+    min-height: 240px;
+  }
+
+  .card-status-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .card-status-dropdown,
+  .form-secondary-btn,
+  .submit-job-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .job-card {
+    width: 100%;
+    flex-basis: 100%;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .card-salary,
+  .job-info-date {
+    margin-top: 8px;
+  }
+}
