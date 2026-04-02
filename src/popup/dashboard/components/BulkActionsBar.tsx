@@ -44,14 +44,26 @@ export function BulkActionsBar({
 
       <div className="bulk-actions-buttons">
         <button type="button" className="bulk-action-btn highlight" onClick={onSelectVisible}>
-          {lang === 'pl' ? 'Zaznacz widoczne' : 'Select visible'}
+          <span className="bulk-action-btn-icon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 11l3 3L22 4" />
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+            </svg>
+          </span>
+          <span>{lang === 'pl' ? 'Zaznacz widoczne' : 'Select visible'}</span>
         </button>
         <button type="button" className="bulk-action-btn" onClick={onClearSelection}>
-          {lang === 'pl' ? 'Wyczysc' : 'Clear'}
+          <span className="bulk-action-btn-icon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </span>
+          <span>{lang === 'pl' ? 'Wyczysc' : 'Clear'}</span>
         </button>
         <button
           type="button"
-          className="bulk-picker-btn"
+          className="bulk-picker-btn status"
           disabled={selectedCount === 0}
           onClick={onOpenBulkStatusPicker}
         >
@@ -68,7 +80,7 @@ export function BulkActionsBar({
         </button>
         <button
           type="button"
-          className="bulk-picker-btn"
+          className="bulk-picker-btn workmode"
           disabled={selectedCount === 0}
           onClick={onOpenBulkWorkModePicker}
         >
@@ -86,7 +98,7 @@ export function BulkActionsBar({
         </button>
         <button
           type="button"
-          className="bulk-picker-btn"
+          className="bulk-picker-btn employment"
           disabled={selectedCount === 0}
           onClick={onOpenBulkEmploymentPicker}
         >
@@ -109,7 +121,16 @@ export function BulkActionsBar({
           disabled={selectedCount === 0}
           onClick={onBulkDelete}
         >
-          {lang === 'pl' ? 'Usun zaznaczone' : 'Delete selected'}
+          <span className="bulk-action-btn-icon" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" />
+              <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <line x1="10" y1="11" x2="10" y2="17" />
+              <line x1="14" y1="11" x2="14" y2="17" />
+            </svg>
+          </span>
+          <span>{lang === 'pl' ? 'Usun zaznaczone' : 'Delete selected'}</span>
         </button>
       </div>
     </div>

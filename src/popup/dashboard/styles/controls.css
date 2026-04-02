@@ -353,6 +353,10 @@
 }
 
 .bulk-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 38px;
   padding: 0 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -374,6 +378,13 @@
   border-color: rgba(0, 247, 255, 0.2);
   background: rgba(0, 247, 255, 0.08);
   transform: translateY(-1px);
+}
+
+.bulk-action-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .bulk-action-btn.highlight {
@@ -430,6 +441,42 @@
     rgba(17, 21, 27, 0.94);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.2);
   transform: translateY(-1px);
+}
+
+.bulk-picker-btn.status {
+  border-color: rgba(0, 247, 255, 0.16);
+  background:
+    linear-gradient(180deg, rgba(0, 247, 255, 0.08), rgba(0, 247, 255, 0.03)),
+    rgba(20, 22, 26, 0.88);
+}
+
+.bulk-picker-btn.status .bulk-picker-btn-icon {
+  color: var(--primary-cyan);
+  background: rgba(0, 247, 255, 0.09);
+}
+
+.bulk-picker-btn.workmode {
+  border-color: rgba(255, 170, 0, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 170, 0, 0.08), rgba(255, 170, 0, 0.03)),
+    rgba(20, 22, 26, 0.88);
+}
+
+.bulk-picker-btn.workmode .bulk-picker-btn-icon {
+  color: var(--status-interview);
+  background: rgba(255, 170, 0, 0.09);
+}
+
+.bulk-picker-btn.employment {
+  border-color: rgba(52, 211, 153, 0.16);
+  background:
+    linear-gradient(180deg, rgba(52, 211, 153, 0.08), rgba(52, 211, 153, 0.03)),
+    rgba(20, 22, 26, 0.88);
+}
+
+.bulk-picker-btn.employment .bulk-picker-btn-icon {
+  color: var(--status-offered);
+  background: rgba(52, 211, 153, 0.09);
 }
 
 .bulk-picker-btn:disabled {
