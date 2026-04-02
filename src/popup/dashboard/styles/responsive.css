@@ -1,5 +1,5 @@
-/* ==========================================================================
-   16. RESPONSYWNOŒÆ
+ï»¿/* ==========================================================================
+   16. RESPONSIVE
    ========================================================================== */
 @media (max-width: 920px) {
   .dashboard-container {
@@ -37,6 +37,7 @@
 
   .filter-group .custom-select,
   .filter-group select,
+  .filter-picker-btn,
   .add-job-btn,
   .bulk-mode-btn {
     flex: 1 1 180px;
@@ -72,6 +73,20 @@
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .form-modal {
+    width: min(calc(100vw - 28px), 860px);
+    max-height: min(92vh, 920px);
+    padding: 24px 20px 22px;
+  }
+
+  .form-stepper {
+    grid-template-columns: 1fr;
+  }
+
+  .portal-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -117,7 +132,8 @@
 
   .bulk-action-btn,
   .bulk-mode-btn,
-  .bulk-status-select {
+  .bulk-picker-btn,
+  .filter-picker-btn {
     width: 100%;
   }
 
@@ -191,7 +207,8 @@
     min-height: 240px;
   }
 
-  .card-status-select {
+  .card-status-select,
+  .card-status-picker {
     width: 100%;
     min-width: 0;
   }
@@ -216,5 +233,25 @@
   .card-salary,
   .job-info-date {
     margin-top: 8px;
+  }
+
+  .form-modal {
+    width: min(calc(100vw - 18px), 100%);
+    padding: 20px 16px 18px;
+    border-radius: 20px;
+  }
+
+  .form-modal-header,
+  .form-modal-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .form-step-chip {
+    justify-content: flex-start;
+  }
+
+  .portal-choice-grid {
+    grid-template-columns: 1fr;
   }
 }

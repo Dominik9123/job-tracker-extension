@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 
 import type { JobApplication, Seniority, WorkMode } from './types';
 
@@ -50,7 +50,7 @@ export const getPortalIcon = (portal: string) => {
 
 export const shouldCloseOverlay = (
   event: React.MouseEvent<HTMLDivElement>,
-  modalElement: HTMLDivElement | null,
+  modalElement: HTMLElement | null,
 ) => {
   if (event.target !== event.currentTarget) return false;
   if (!modalElement) return true;
@@ -65,3 +65,4 @@ export const shouldCloseOverlay = (
 
   return distanceToModal > safeDistance;
 };
+
