@@ -1,5 +1,5 @@
 # Job Tracker Extension
-
+https://job-tracker-extension-sand.vercel.app/
 Job Tracker Extension is a React + TypeScript demo project for tracking job applications in a clean dashboard UI.
 
 The current version focuses on the product experience and demo flow:
